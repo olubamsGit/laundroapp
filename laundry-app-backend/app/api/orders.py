@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.schemas.order import OrderCreate
-from app.models.order import Order, OrderStatus
-from app.api.deps import get_db, customer_user, admin_user
+from app.models.order import Order, OrderStatus, LaundryType as ModelLaundryType
+from app.api.deps import get_db, customer_user, admin_user, driver_user
 from app.models.user import User, UserRole
 from app.db.base import Base
 
@@ -18,7 +18,7 @@ def create_order(
     new_order = Order(
         customer_id=current_user.id,
         pickup_address=order_data.pickup_address,
-        laundry_type=order_data.laundry_type,
+        laundry_type=ModelLaundryType(order_data.laundry_type.value),
         pickup_date=order_data.pickup_date,
         special_instructions=order_data.special_instructions,
     )
@@ -78,4 +78,31 @@ def assign_order_to_driver(
         "order_id": str(order.id),
         "driver": driver.email,
         "status": order.status.value
+    }
+
+@router.get("/driver/assigned", summary="Driver: view assigned orders")
+def get_assigned_orders(
+    current_user: User = Depends(driver_user),
+    db: Session = Depends(get_db)
+):
+    orders = db.query(Order).filter(Order.driver_id == current_user.id).all()
+
+    if not orders:
+        return {
+            "message": "No assigned orders yet",
+            "orders": []
+        }
+
+    return {
+        "driver": current_user.email,
+        "assigned_orders": [
+            {
+                "order_id": o.id,
+                "pickup_address": o.pickup_address,
+                "status": o.status.value,
+                "pickup_date": o.pickup_date,
+                "special_instructions": o.special_instructions
+            }
+            for o in orders
+        ]
     }

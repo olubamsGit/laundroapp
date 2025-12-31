@@ -18,6 +18,9 @@ from passlib.context import CryptContext
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 pwd_context = CryptContext(
     schemes=["argon2"],
+    argon2__memory_cost=65536,  # matches m=65536
+    argon2__time_cost=3,        # matches t=3
+    argon2__parallelism=4,      # matches p=4
     deprecated="auto"
 )
 
@@ -44,12 +47,12 @@ def register_user(user: UserRegister, db: Session = Depends(get_db)):
         )
 
     # Hash password
-    hashed_password = pwd_context.hash(user.password)
+    hashed_pw = pwd_context.hash(user.password)
 
     # Create inactive, unverified customer account
     new_user = User(
         email=user.email,
-        hashed_password=pwd_context.hash(user.password),
+        hashed_password=hashed_pw,
         role=UserRole.customer,
         is_verified=False,
         is_active=True,
@@ -100,8 +103,6 @@ def login_user(
     if not user:
         raise HTTPException(status_code=400, detail="Invalid email or password")
 
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
     if not pwd_context.verify(password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid email or password")
 
@@ -110,7 +111,7 @@ def login_user(
         raise HTTPException(status_code=403, detail="Email not verified yet")
 
     access_token = create_access_token(user_id=user.id, role=user.role)
-    refresh_token = create_email_verification_token(user.email)  # optional reuse
+    refresh_token = create_refresh_token(user.id)
 
     return {
         "access_token": access_token,

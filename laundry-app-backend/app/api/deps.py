@@ -10,12 +10,6 @@ from fastapi.security import OAuth2PasswordBearer
 # --------------------
 # Database Session
 # --------------------
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 # --------------------
