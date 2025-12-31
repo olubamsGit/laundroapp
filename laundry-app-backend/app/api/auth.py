@@ -15,11 +15,9 @@ from app.core.token import (
 from app.services.email_service import send_verification_email
 from passlib.context import CryptContext
 
-
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 pwd_context = CryptContext(
     schemes=["argon2"],
-    default="argon2",
     deprecated="auto"
 )
 
@@ -46,12 +44,12 @@ def register_user(user: UserRegister, db: Session = Depends(get_db)):
         )
 
     # Hash password
-    hashed_pw = pwd_context.hash(user.password)
+    hashed_password = pwd_context.hash(user.password)
 
     # Create inactive, unverified customer account
     new_user = User(
         email=user.email,
-        hashed_password=hashed_pw,
+        hashed_password=pwd_context.hash(user.password),
         role=UserRole.customer,
         is_verified=False,
         is_active=True,
@@ -87,34 +85,36 @@ def verify_email(token: str, db: Session = Depends(get_db)):
 
     return {"message": "Email verified. You may now log in."}
 
-@router.post("/login", response_model=TokenResponse)
-def login(user: UserLogin, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.email == user.email).first()
+from fastapi import Form
+from fastapi.security import OAuth2PasswordRequestForm
 
-    # Generic error to avoid leaking which part failed
-    invalid_creds_error = HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Invalid email or password"
-    )
+@router.post("/login")
+def login_user(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    email = form_data.username
+    password = form_data.password
 
-    if not db_user:
-        raise invalid_creds_error
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid email or password")
 
-    if not db_user.is_verified:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email not verified"
-        )
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-    if not pwd_context.verify(user.password, db_user.hashed_password):
-        raise invalid_creds_error
+    if not pwd_context.verify(password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Invalid email or password")
 
-    # All good → issue tokens
-    access_token = create_access_token(str(db_user.id), db_user.role.value)
-    refresh_token = create_refresh_token(str(db_user.id))
 
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        token_type="bearer",
-    )
+    if not user.is_verified:
+        raise HTTPException(status_code=403, detail="Email not verified yet")
+
+    access_token = create_access_token(user_id=user.id, role=user.role)
+    refresh_token = create_email_verification_token(user.email)  # optional reuse
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "role": user.role
+}

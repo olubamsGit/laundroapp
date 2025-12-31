@@ -2,6 +2,7 @@ import uuid
 from sqlalchemy import Column, String, Enum, Date, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+from app.models.user import User
 from app.db.base import Base
 from enum import Enum as PyEnum
 
@@ -23,9 +24,9 @@ class Order(Base):
     __tablename__ = "orders"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, index=True)
+
     customer_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     driver_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-
 
     pickup_address = Column(String, nullable=False)
     laundry_type = Column(Enum(LaundryType), nullable=False)
@@ -33,5 +34,6 @@ class Order(Base):
     status = Column(Enum(OrderStatus), default=OrderStatus.scheduled, nullable=False)
     special_instructions = Column(String, nullable=True)
 
-    customer = relationship("User")
+    # Explicit relationships to resolve ambiguity
+    customer = relationship("User", foreign_keys=[customer_id])
     driver = relationship("User", foreign_keys=[driver_id])
