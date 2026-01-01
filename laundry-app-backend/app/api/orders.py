@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.schemas.order import OrderCreate
 from app.models.order import Order, OrderStatus, LaundryType as ModelLaundryType
 from app.services.pricing import calc_price
+from app.services.email_service import send_order_status_update_email
 from app.api.deps import get_db, customer_user, admin_user, driver_user
 from app.models.user import User, UserRole
 from app.db.base import Base
@@ -144,6 +145,7 @@ def update_order_status(
     new_status: OrderStatus,
     current_user: User = Depends(driver_user),
     db: Session = Depends(get_db),
+    send_order_status_update_email(order.id, current_user.email, new_status.value)
 ):
     order = db.query(Order).filter(Order.id == order_id).first()
 
