@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.schemas.order import OrderCreate
 from app.models.order import Order, OrderStatus, LaundryType as ModelLaundryType
+from app.services.pricing import calc_price
 from app.api.deps import get_db, customer_user, admin_user, driver_user
 from app.models.user import User, UserRole
 from app.db.base import Base
@@ -270,4 +271,60 @@ def admin_order_summary(
     return {
         "total_orders": sum(summary.values()),
         "by_status": summary,
+    }
+
+
+@router.get("/quote", summary="Customer: get pricing quote by weight")
+def quote_price(
+    weight_lbs: int,
+    current_user: User = Depends(customer_user),
+):
+    breakdown = calc_price(weight_lbs)
+
+    return {
+        "weight_lbs": breakdown.weight_lbs,
+        "price_per_lb_cents": breakdown.price_per_lb_cents,
+        "service_fee_cents": breakdown.service_fee_cents,
+        "delivery_fee_cents": breakdown.delivery_fee_cents,
+        "tax_rate_bp": breakdown.tax_rate_bp,
+        "subtotal_cents": breakdown.subtotal_cents,
+        "tax_cents": breakdown.tax_cents,
+        "total_cents": breakdown.total_cents,
+    }
+
+
+@router.patch("/admin/set-weight/{order_id}", summary="Admin: set weight and calculate totals")
+def admin_set_weight_and_price(
+    order_id: str,
+    weight_lbs: int,
+    admin: User = Depends(admin_user),
+    db: Session = Depends(get_db),
+):
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    breakdown = calc_price(
+        weight_lbs=weight_lbs,
+        price_per_lb_cents=order.price_per_lb_cents,
+        service_fee_cents=order.service_fee_cents,
+        delivery_fee_cents=order.delivery_fee_cents,
+        tax_rate_bp=order.tax_rate_bp,
+    )
+
+    order.weight_lbs = breakdown.weight_lbs
+    order.subtotal_cents = breakdown.subtotal_cents
+    order.tax_cents = breakdown.tax_cents
+    order.total_cents = breakdown.total_cents
+
+    db.commit()
+    db.refresh(order)
+
+    return {
+        "message": "Pricing updated",
+        "order_id": str(order.id),
+        "weight_lbs": order.weight_lbs,
+        "subtotal_cents": order.subtotal_cents,
+        "tax_cents": order.tax_cents,
+        "total_cents": order.total_cents,
     }
