@@ -35,9 +35,10 @@ def startup():
 
 
 # ========= ROUTES =========
-app.include_router(auth_router)
-app.include_router(secure_test_router)
-app.include_router(orders_router)
+app.include_router(auth_router, prefix="/api/v1")
+app.include_router(orders_router, prefix="/api/v1")
+app.include_router(secure_test_router, prefix="/api/v1")
+
 
 
 # ========= ROOT TEST =========

@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from typing import Optional
+from app.schemas.order_response import OrderPublic, OrderTimeline, ListResponse, ListMeta
 from app.schemas.order import OrderCreate
 from app.models.order import Order, OrderStatus, LaundryType as ModelLaundryType
 from app.services.pricing import calc_price
@@ -40,49 +42,64 @@ def create_order(
         "status": new_order.status.value
     }
 
-@router.get("/my", summary="Customer: track my orders")
+@router.get("/my", response_model=ListResponse, summary="Customer: track my orders (paginated)")
 def track_my_orders(
+    limit: int = 20,
+    offset: int = 0,
+    status: Optional[OrderStatus] = None,
     current_user: User = Depends(customer_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
+    # guardrails
+    limit = max(1, min(limit, 100))
+    offset = max(0, offset)
+
+    base_q = db.query(Order).filter(Order.customer_id == current_user.id)
+
+    if status:
+        base_q = base_q.filter(Order.status == status)
+
+    total = base_q.count()
+
     orders = (
-        db.query(Order)
-        .filter(Order.customer_id == current_user.id)
-        .order_by(Order.pickup_date.desc())
+        base_q.order_by(Order.pickup_date.desc())
+        .limit(limit)
+        .offset(offset)
         .all()
     )
 
-    return {
-        "customer": current_user.email,
-        "orders": [
-            {
-                "order_id": o.id,
-                "pickup_address": o.pickup_address,
-                "pickup_date": o.pickup_date,
-                "status": o.status.value,
-                "timeline": {
-                    "scheduled": True,
-                    "picked_up": o.status in [
-                        OrderStatus.picked_up,
-                        OrderStatus.in_cleaning,
-                        OrderStatus.ready_for_delivery,
-                        OrderStatus.delivered,
-                    ],
-                    "in_cleaning": o.status in [
-                        OrderStatus.in_cleaning,
-                        OrderStatus.ready_for_delivery,
-                        OrderStatus.delivered,
-                    ],
-                    "ready_for_delivery": o.status in [
-                        OrderStatus.ready_for_delivery,
-                        OrderStatus.delivered,
-                    ],
-                    "delivered": o.status == OrderStatus.delivered,
-                },
-            }
-            for o in orders
-        ],
-    }
+    def timeline_for(s: OrderStatus) -> OrderTimeline:
+        return OrderTimeline(
+            scheduled=True,
+            picked_up=s in [OrderStatus.picked_up, OrderStatus.in_cleaning, OrderStatus.ready_for_delivery, OrderStatus.delivered],
+            in_cleaning=s in [OrderStatus.in_cleaning, OrderStatus.ready_for_delivery, OrderStatus.delivered],
+            ready_for_delivery=s in [OrderStatus.ready_for_delivery, OrderStatus.delivered],
+            delivered=s == OrderStatus.delivered,
+        )
+
+    data = [
+        OrderPublic(
+            order_id=o.id,
+            pickup_address=o.pickup_address,
+            pickup_date=o.pickup_date,
+            status=o.status.value,
+            special_instructions=o.special_instructions,
+            driver_id=o.driver_id,
+            customer_id=o.customer_id,
+            weight_lbs=getattr(o, "weight_lbs", None),
+            subtotal_cents=getattr(o, "subtotal_cents", None),
+            tax_cents=getattr(o, "tax_cents", None),
+            total_cents=getattr(o, "total_cents", None),
+            timeline=timeline_for(o.status),
+        )
+        for o in orders
+    ]
+
+    return ListResponse(
+        data=data,
+        meta=ListMeta(limit=limit, offset=offset, count=len(data), total=total),
+    )
+
 
 @router.patch("/assign/{order_id}")
 def assign_order_to_driver(
@@ -112,32 +129,47 @@ def assign_order_to_driver(
         "status": order.status.value
     }
 
-@router.get("/driver/assigned", summary="Driver: view assigned orders")
+@router.get("/driver/assigned", response_model=ListResponse, summary="Driver: view assigned orders (paginated)")
 def get_assigned_orders(
+    limit: int = 20,
+    offset: int = 0,
+    status: Optional[OrderStatus] = None,
     current_user: User = Depends(driver_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    orders = db.query(Order).filter(Order.driver_id == current_user.id).all()
+    limit = max(1, min(limit, 100))
+    offset = max(0, offset)
 
-    if not orders:
-        return {
-            "message": "No assigned orders yet",
-            "orders": []
-        }
+    base_q = db.query(Order).filter(Order.driver_id == current_user.id)
+    if status:
+        base_q = base_q.filter(Order.status == status)
 
-    return {
-        "driver": current_user.email,
-        "assigned_orders": [
-            {
-                "order_id": o.id,
-                "pickup_address": o.pickup_address,
-                "status": o.status.value,
-                "pickup_date": o.pickup_date,
-                "special_instructions": o.special_instructions
-            }
-            for o in orders
-        ]
-    }
+    total = base_q.count()
+
+    orders = (
+        base_q.order_by(Order.pickup_date.desc())
+        .limit(limit)
+        .offset(offset)
+        .all()
+    )
+
+    data = [
+        OrderPublic(
+            order_id=o.id,
+            pickup_address=o.pickup_address,
+            pickup_date=o.pickup_date,
+            status=o.status.value,
+            special_instructions=o.special_instructions,
+            driver_id=o.driver_id,
+            customer_id=o.customer_id,
+        )
+        for o in orders
+    ]
+
+    return ListResponse(
+        data=data,
+        meta=ListMeta(limit=limit, offset=offset, count=len(data), total=total),
+    )
 
 @router.patch("/driver/update-status/{order_id}", summary="Driver: update order status")
 def update_order_status(
@@ -331,3 +363,5 @@ def admin_set_weight_and_price(
         "tax_cents": order.tax_cents,
         "total_cents": order.total_cents,
     }
+
+
