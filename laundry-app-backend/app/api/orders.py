@@ -144,8 +144,7 @@ def update_order_status(
     order_id: str,
     new_status: OrderStatus,
     current_user: User = Depends(driver_user),
-    db: Session = Depends(get_db),
-    send_order_status_update_email(order.id, current_user.email, new_status.value)
+    db: Session = Depends(get_db)
 ):
     order = db.query(Order).filter(Order.id == order_id).first()
 
@@ -169,6 +168,8 @@ def update_order_status(
     order.status = new_status
     db.commit()
     db.refresh(order)
+
+    send_order_status_update_email(order.id, current_user.email, new_status.value)
 
     return {
         "message": "Order status updated",
