@@ -17,7 +17,7 @@ def send_email(subject: str, to_email: str, content: str):
     try:
         sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
         message = Mail(
-            from_email="ricohatley@gmail.com",  # Your verified SendGrid email
+            from_email="youtvtosin01@gmail.com",  # Your verified SendGrid email
             to_emails=to_email,
             subject=subject,
             plain_text_content=content,
