@@ -30,7 +30,7 @@ def get_db():
 
 
 @router.post("/register")
-def register_user(user: UserRegister, db: Session = Depends(get_db)):
+async def register_user(user: UserRegister, db: Session = Depends(get_db)):
     # Check if email exists
     existing = db.query(User).filter(User.email == user.email).first()
     if existing:
