@@ -4,13 +4,16 @@ from sendgrid.helpers.mail import Mail
 from fastapi import HTTPException
 from app.core.config import settings
 
-def send_verification_email(email: str, token: str):
-    verification_link = f"{settings.FRONTEND_BASE_URL}/api/v1/auth/verify-email?token={token}"
-    print("==============================================")
-    print(f"TO: {email}")
-    print("SUBJECT: Verify your email")
-    print(f"CLICK THIS LINK TO VERIFY: {verification_link}")
-    print("==============================================\n")
+# Fully corrected send_verification_email
+async def send_verification_email(email: str, token: str):
+    base_url = settings.FRONTEND_BASE_URL.rstrip('/')
+    verification_link = f"{base_url}/api/v1/auth/verify-email?token={token}"
+    
+    subject = "Verify your email"
+    content = f"Please click the link to verify your email: {verification_link}"
+    
+    # This is the line that actually triggers SendGrid
+    return await send_email(email, subject, content)
 
 
 async def send_email(to_email: str, subject: str, content: str):
@@ -34,14 +37,16 @@ async def send_email(to_email: str, subject: str, content: str):
         return None
 
 
-def send_order_status_update_email(order_id: str, customer_email: str, status: str):
+d# Use 'async def' so you can use 'await' inside
+async def send_order_status_update_email(order_id: str, customer_email: str, status: str):
     subject = f"Order #{order_id} status update"
-    content = f"Your order #{order_id} has been updated to: {status}. Thank you for using our service."
-    return send_email(subject, customer_email, content)
+    content = f"Your order #{order_id} has been updated to: {status}."
+    # You MUST await the send_email coroutine
+    return await send_email(customer_email, subject, content)
 
-
-def send_pricing_update_email(order_id: str, customer_email: str, total_cents: int):
+async def send_pricing_update_email(order_id: str, customer_email: str, total_cents: int):
     subject = f"Order #{order_id} pricing update"
     total_dollars = total_cents / 100
     content = f"Your order #{order_id} pricing has been updated. Total cost: ${total_dollars:.2f}."
-    return send_email(subject, customer_email, content)
+    # You MUST await the send_email coroutine
+    return await send_email(customer_email, subject, content)
