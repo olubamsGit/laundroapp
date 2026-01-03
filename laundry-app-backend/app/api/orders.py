@@ -10,6 +10,7 @@ from app.api.deps import get_db, customer_user, admin_user, driver_user
 from app.models.user import User, UserRole
 from app.db.base import Base
 from app.services.stripe_service import create_payment_intent
+from app.core.email import send_order_status_update_email
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 ALLOWED_STATUS_TRANSITIONS = {
