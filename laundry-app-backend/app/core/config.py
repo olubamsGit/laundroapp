@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int
     REFRESH_TOKEN_EXPIRE_DAYS: int
     DATABASE_URL: str
+    FRONTEND_BASE_URL: str
     
     # Add this line to handle the SendGrid key
     sendgrid_api_key: Optional[str] = None
