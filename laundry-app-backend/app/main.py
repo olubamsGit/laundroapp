@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.openapi.models import OAuthFlows, OAuth2
 from fastapi.security import OAuth2PasswordBearer
@@ -15,7 +16,8 @@ from app.models import user, order
 from app.api.auth import router as auth_router
 from app.api.test_secure import router as secure_test_router
 from app.api.orders import router as orders_router
-
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 
 
 # ========= CREATE APP FIRST =========
@@ -24,6 +26,17 @@ app = FastAPI(
     description="Mobile laundry backend with JWT auth",
     version="1.0.0",
     servers=[{"url": "http://127.0.0.1:8000"}],
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:19006",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -74,3 +87,18 @@ def custom_openapi():
     return app.openapi_schema
 
 app.openapi = custom_openapi
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response: Response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+@app.get("/health", tags=["Health"])
+def health_check():
+    return {"status": "ok"}
