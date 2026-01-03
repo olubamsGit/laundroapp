@@ -19,14 +19,12 @@ RUN pip install --upgrade pip
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy app
+# Copy everything from laundry-app-backend into /app
 COPY . .
 
-# Env port
-ENV PORT=8000
+# Use Render's default port 10000
+ENV PORT=10000
+EXPOSE 10000
 
-# Expose API port
-EXPOSE 8000
-
-# Production server
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Point to app.main because main.py is inside the app/ folder
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "10000"]
