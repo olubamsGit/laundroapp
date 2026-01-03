@@ -13,19 +13,25 @@ def send_verification_email(email: str, token: str):
     print("==============================================\n")
 
 
-def send_email(subject: str, to_email: str, content: str):
+async def send_email(to_email: str, subject: str, content: str):
+    # This pulls from your Render environment variables
+    api_key = os.environ.get('SENDGRID_API_KEY')
+    sender = os.environ.get('SENDGRID_FROM_EMAIL') # Your verified sender email
+    
+    message = Mail(
+        from_email=sender,
+        to_emails=to_email,
+        subject=subject,
+        plain_text_content=content
+    )
+    
     try:
-        sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
-        message = Mail(
-            from_email="youtvtosin01@gmail.com",  # Your verified SendGrid email
-            to_emails=to_email,
-            subject=subject,
-            plain_text_content=content,
-        )
+        sg = SendGridAPIClient(api_key)
         response = sg.send(message)
-        return response
+        return response.status_code
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Error sending email")
+        print(f"SendGrid Error: {e}")
+        return None
 
 
 def send_order_status_update_email(order_id: str, customer_email: str, status: str):
