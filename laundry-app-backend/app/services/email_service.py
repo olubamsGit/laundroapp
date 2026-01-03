@@ -37,16 +37,14 @@ async def send_email(to_email: str, subject: str, content: str):
         return None
 
 
-d# Use 'async def' so you can use 'await' inside
+# Use 'async def' so you can use 'await' inside
 async def send_order_status_update_email(order_id: str, customer_email: str, status: str):
     subject = f"Order #{order_id} status update"
     content = f"Your order #{order_id} has been updated to: {status}."
-    # You MUST await the send_email coroutine
     return await send_email(customer_email, subject, content)
 
 async def send_pricing_update_email(order_id: str, customer_email: str, total_cents: int):
     subject = f"Order #{order_id} pricing update"
     total_dollars = total_cents / 100
     content = f"Your order #{order_id} pricing has been updated. Total cost: ${total_dollars:.2f}."
-    # You MUST await the send_email coroutine
     return await send_email(customer_email, subject, content)
