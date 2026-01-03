@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Update pip
+RUN pip install --upgrade pip
+
 # Install deps
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -19,8 +22,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy app
 COPY . .
 
+# Env port
+ENV PORT=8000
+
 # Expose API port
 EXPOSE 8000
 
 # Production server
-CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "app.main:app", "--bind", "0.0.0.0:8000", "--workers", "4"]
+CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "app.main:app", "--bind", "0.0.0.0:8000"]
