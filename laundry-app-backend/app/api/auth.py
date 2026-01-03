@@ -7,7 +7,8 @@ from app.db.session import SessionLocal
 from app.models.user import User, UserRole
 from app.services.password_validation import validate_password_strength
 from app.core.token import create_email_verification_token, verify_email_token, create_access_token, create_refresh_token
-from app.services.email_service import send_verification_email, get_password_hash
+from app.services.email_service import send_verification_email
+from app.core.security import get_password_hash  # Correct path
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 from fastapi import Form
