@@ -9,6 +9,7 @@ from app.services.email_service import send_order_status_update_email
 from app.api.deps import get_db, customer_user, admin_user, driver_user
 from app.models.user import User, UserRole
 from app.db.base import Base
+from app.services.stripe_service import create_payment_intent
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 ALLOWED_STATUS_TRANSITIONS = {
@@ -365,3 +366,31 @@ def admin_set_weight_and_price(
     }
 
 
+@router.post("/pay/{order_id}", summary="Customer: pay for order")
+def pay_for_order(
+    order_id: str,
+    current_user: User = Depends(customer_user),
+    db: Session = Depends(get_db),
+):
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if order.customer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your order")
+
+    if not order.total_cents:
+        raise HTTPException(status_code=400, detail="Order pricing not finalized")
+
+    if order.is_paid:
+        raise HTTPException(status_code=400, detail="Order already paid")
+
+    intent = create_payment_intent(order.total_cents, str(order.id))
+
+    order.stripe_payment_intent_id = intent.id
+    db.commit()
+
+    return {
+        "client_secret": intent.client_secret,
+        "amount_cents": order.total_cents,
+    }

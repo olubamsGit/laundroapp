@@ -1,22 +1,10 @@
 import uuid
-from sqlalchemy import Column, String, Enum, Date, ForeignKey, Integer
+from sqlalchemy import Column, String, Enum, Date, ForeignKey, Integer, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.models.user import User
 from app.db.base import Base
 from enum import Enum as PyEnum
-
-
-weight_lbs = Column(Integer, nullable=True)
-
-price_per_lb_cents = Column(Integer, nullable=False, default=175)
-service_fee_cents = Column(Integer, nullable=False, default=300)
-delivery_fee_cents = Column(Integer, nullable=False, default=500)
-tax_rate_bp = Column(Integer, nullable=False, default=700)  # basis points: 700 = 7.00%
-
-subtotal_cents = Column(Integer, nullable=True)
-tax_cents = Column(Integer, nullable=True)
-total_cents = Column(Integer, nullable=True)
 
 
 class LaundryType(PyEnum):
@@ -45,6 +33,19 @@ class Order(Base):
     pickup_date = Column(Date, nullable=False)
     status = Column(Enum(OrderStatus), default=OrderStatus.scheduled, nullable=False)
     special_instructions = Column(String, nullable=True)
+
+    weight_lbs = Column(Integer, nullable=True)
+
+    price_per_lb_cents = Column(Integer, nullable=False, default=175)
+    service_fee_cents = Column(Integer, nullable=False, default=300)
+    delivery_fee_cents = Column(Integer, nullable=False, default=500)
+    tax_rate_bp = Column(Integer, nullable=False, default=700)  # basis points: 700 = 7.00%
+
+    subtotal_cents = Column(Integer, nullable=True)
+    tax_cents = Column(Integer, nullable=True)
+    total_cents = Column(Integer, nullable=True)
+    is_paid = Column(Boolean, default=False)
+    stripe_payment_intent_id = Column(String, nullable=True)
 
     # Explicit relationships to resolve ambiguity
     customer = relationship("User", foreign_keys=[customer_id])

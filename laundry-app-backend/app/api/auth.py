@@ -6,14 +6,11 @@ from app.schemas.auth import TokenResponse
 from app.db.session import SessionLocal
 from app.models.user import User, UserRole
 from app.services.password_validation import validate_password_strength
-from app.core.token import (
-    create_email_verification_token,
-    verify_email_token,
-    create_access_token,
-    create_refresh_token,
-)
+from app.core.token import create_email_verification_token, verify_email_token, create_access_token, create_refresh_token
 from app.services.email_service import send_verification_email
 from passlib.context import CryptContext
+from fastapi import Form
+from fastapi.security import OAuth2PasswordRequestForm
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 pwd_context = CryptContext(
@@ -63,7 +60,7 @@ def register_user(user: UserRegister, db: Session = Depends(get_db)):
     db.refresh(new_user)
 
     # Create token + print "email"
-    token = create_email_verification_token(new_user.id)
+    token = create_email_verification_token(new_user.email)
     send_verification_email(new_user.email, token)
 
     return {
@@ -71,25 +68,33 @@ def register_user(user: UserRegister, db: Session = Depends(get_db)):
         "email": new_user.email
     }
 
-    from app.core.token import verify_email_token
 
-@router.get("/verify-email")
-def verify_email(token: str, db: Session = Depends(get_db)):
-    user_id = verify_email_token(token)
-    if not user_id:
-        raise HTTPException(status_code=400, detail="Invalid or expired token")
 
-    user = db.query(User).filter(User.id == user_id).first()
+@router.get("/verify-email", summary="Verify email address")
+def verify_email(
+    token: str,
+    db: Session = Depends(get_db),
+):
+    email = verify_email_token(token)
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification token",
+        )
+
+    user = db.query(User).filter(User.email == email).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    if user.is_verified:
+        return {"message": "Account already verified"}
 
     user.is_verified = True
     db.commit()
 
-    return {"message": "Email verified. You may now log in."}
+    return {"message": "Account verified successfully"}
 
-from fastapi import Form
-from fastapi.security import OAuth2PasswordRequestForm
+
 
 @router.post("/login")
 def login_user(

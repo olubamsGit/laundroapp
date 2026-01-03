@@ -26,7 +26,7 @@ app = FastAPI(
     servers=[{"url": "http://127.0.0.1:8000"}],
 )
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 # ========= STARTUP DB INIT =========
 @app.on_event("startup")
@@ -49,36 +49,6 @@ def root():
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
-
-    openapi_schema = get_openapi(
-        title=app.title,
-        version=app.version,
-        description=app.description,
-        routes=app.routes,
-    )
-
-    openapi_schema["components"]["securitySchemes"] = {
-        "BearerAuth": {
-            "type": "http",
-            "scheme": "bearer",
-            "bearerFormat": "JWT"
-        }
-    }
-
-    for path in openapi_schema["paths"]:
-        for method in openapi_schema["paths"][path]:
-            openapi_schema["paths"][path][method]["security"] = [{"BearerAuth": []}]
-
-    app.openapi_schema = openapi_schema
-    return app.openapi_schema
-
-app.openapi = custom_openapi
-
-from fastapi.openapi.utils import get_openapi
-
-def custom_openapi():
-    if app.openapi_schema:
-        return app.openapi_schema
     
     openapi_schema = get_openapi(
         title=app.title,
@@ -92,7 +62,7 @@ def custom_openapi():
             "type": "oauth2",
             "flows": {
                 "password": {
-                    "tokenUrl": "/auth/login",
+                    "tokenUrl": "/api/v1/auth/login",
                     "scopes": {}
                 }
             }
