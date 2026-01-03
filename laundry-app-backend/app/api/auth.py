@@ -7,7 +7,8 @@ from app.db.session import SessionLocal
 from app.models.user import User, UserRole
 from app.services.password_validation import validate_password_strength
 from app.core.token import create_email_verification_token, verify_email_token, create_access_token, create_refresh_token
-from app.services.email_service import send_verification_email
+from app.services.email_service import send_verification_email, get_password_hash
+from jose import jwt, JWTError
 from passlib.context import CryptContext
 from fastapi import Form
 from fastapi.security import OAuth2PasswordRequestForm
@@ -124,3 +125,49 @@ def login_user(
         "token_type": "bearer",
         "role": user.role
 }
+
+
+# In app/api/auth.py
+
+@router.post("/forgot-password")
+async def forgot_password(email_data: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    # 1. Check if user exists
+    user = db.query(User).filter(User.email == email_data.email).first()
+    if not user:
+        # We return a 200 even if the user doesn't exist for security (prevents email harvesting)
+        return {"message": "If an account exists with this email, a reset link has been sent."}
+
+    # 2. Create a password reset token (usually expires in 15-30 mins)
+    reset_token = create_password_reset_token(user.email)
+
+    # 3. Send the email using your existing service
+    await send_password_reset_email(user.email, reset_token)
+    
+    return {"message": "Password reset link sent."}
+
+
+@router.post("/reset-password")
+async def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
+    # 1. Decode and validate the token
+    try:
+        payload = jwt.decode(data.token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        email: str = payload.get("sub")
+        # Ensure the token has the correct scope so a login token can't reset a password
+        if payload.get("scope") != "password_reset":
+            raise HTTPException(status_code=400, detail="Invalid token scope")
+    except JWTError:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    # 2. Find the user in the database
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # 3. Hash the new password and update
+    user.hashed_password = get_password_hash(data.new_password)
+    
+    # 4. Save changes
+    db.add(user)
+    db.commit()
+
+    return {"message": "Password has been reset successfully."}

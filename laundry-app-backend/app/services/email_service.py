@@ -48,3 +48,16 @@ async def send_pricing_update_email(order_id: str, customer_email: str, total_ce
     total_dollars = total_cents / 100
     content = f"Your order #{order_id} pricing has been updated. Total cost: ${total_dollars:.2f}."
     return await send_email(customer_email, subject, content)
+
+
+    # In app/services/email_service.py
+
+async def send_password_reset_email(email: str, token: str):
+    base_url = settings.FRONTEND_BASE_URL.rstrip('/')
+    reset_link = f"{base_url}/reset-password?token={token}"
+    
+    subject = "Password Reset Request"
+    content = f"You requested a password reset. Click the link to choose a new password: {reset_link}\n\nIf you did not request this, please ignore this email."
+    
+    # Correct order: recipient, subject, content
+    return await send_email(email, subject, content)
