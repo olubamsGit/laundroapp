@@ -1,8 +1,9 @@
 import uuid
-from sqlalchemy import Column, String, Boolean, Enum
+import enum
+from sqlalchemy import Column, String, Boolean, Enum, DateTime # Add DateTime
+from sqlalchemy.sql import func # Add func for timestamps
 from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import Base
-import enum
 
 class UserRole(str, enum.Enum):
     customer = "customer"
@@ -18,3 +19,6 @@ class User(Base):
     role = Column(Enum(UserRole), default=UserRole.customer, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     is_verified = Column(Boolean, default=False, nullable=False)
+    
+    # Add this line to track account age
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

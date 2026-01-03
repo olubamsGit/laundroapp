@@ -17,7 +17,7 @@ RUN pip install --upgrade pip
 
 # Install deps
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && alembic upgrade head
 
 # Copy everything from laundry-app-backend into /app
 COPY . .
