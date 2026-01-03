@@ -61,7 +61,7 @@ def register_user(user: UserRegister, db: Session = Depends(get_db)):
 
     # Create token + print "email"
     token = create_email_verification_token(new_user.email)
-    send_verification_email(new_user.email, token)
+    await send_verification_email(new_user.email, token)
 
     return {
         "message": "Account created. Please check your email to verify your account.",
